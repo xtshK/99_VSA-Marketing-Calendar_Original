@@ -75,6 +75,11 @@ function useCampColors(items) {
   names.forEach(function(c,i){ map[c]=CP[i%CP.length]; });
   return map;
 }
+var MY_ID = null;
+function canEdit(item) { return !item || !item._owner || item._owner === MY_ID; }
+async function loadConfig() {
+  try { var r = await fetch("/api/config"); var j = await r.json(); MY_ID = j.userId || null; } catch (e) {}
+}
 async function loadData() {
   try { var r=await fetch("/api/data"); var j=await r.json(); return Array.isArray(j)?j:[]; } catch(e){ return []; }
 }
@@ -478,8 +483,9 @@ function TRow(props) {
         <span style={{fontSize:11,color:"#888",marginLeft:6}}>{props.item.contentType+" - "+props.item.medium}</span>
         <span style={{fontSize:10,color:"#bbb",marginLeft:6}}>{disp}</span>
       </div>
-      <button onClick={function(){props.onEdit(props.item);}} style={{background:"none",border:"none",cursor:"pointer",color:"#bbb",fontSize:12,padding:"0 3px"}}>&#9998;</button>
-      <button onClick={function(){props.onRemove(props.item.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#bbb",fontSize:12,padding:"0 3px"}}>&#10005;</button>
+      {canEdit(props.item)&&<button onClick={function(){props.onEdit(props.item);}} style={{background:"none",border:"none",cursor:"pointer",color:"#bbb",fontSize:12,padding:"0 3px"}}>&#9998;</button>}
+      {canEdit(props.item)&&<button onClick={function(){props.onRemove(props.item.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#bbb",fontSize:12,padding:"0 3px"}}>&#10005;</button>}
+      {!canEdit(props.item)&&<span style={{fontSize:10,color:"#ccc",padding:"0 3px"}} title={"Owned by "+props.item._owner}>🔒</span>}
     </div>
   );
 }
@@ -610,8 +616,8 @@ function AView(props) {
                           <span style={{color:color,fontSize:9,flexShrink:0}}>&#9679;</span>
                           <span style={{color:"#333",fontWeight:600,flex:1}}>{item.title}</span>
                           <span style={{color:"#aaa",fontSize:10}}>{item.goLiveDate||item.timingNote}</span>
-                          <button onClick={function(){props.onEdit(item);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#9998;</button>
-                          <button onClick={function(){props.onRemove(item.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#10005;</button>
+                          {canEdit(item)&&<button onClick={function(){props.onEdit(item);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#9998;</button>}
+                          {canEdit(item)&&<button onClick={function(){props.onRemove(item.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#10005;</button>}
                         </div>
                       );})}
                     </div>
@@ -669,8 +675,8 @@ function VView(props) {
                   <span style={{fontWeight:600,color:"#222",flex:1}}>{item.title}</span>
                   <span style={{color:"#aaa",fontSize:10,whiteSpace:"nowrap"}}>{item.contentType}</span>
                   <span style={{color:"#bbb",fontSize:10,whiteSpace:"nowrap",marginLeft:6}}>{item.goLiveDate||item.timingNote||("Wk "+item.week)}</span>
-                  <button onClick={function(){props.onEdit(item);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#9998;</button>
-                  <button onClick={function(){props.onRemove(item.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#10005;</button>
+                  {canEdit(item)&&<button onClick={function(){props.onEdit(item);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#9998;</button>}
+                  {canEdit(item)&&<button onClick={function(){props.onRemove(item.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11,padding:"0 2px"}}>&#10005;</button>}
                 </div>
               );})}
             </div>
@@ -735,7 +741,7 @@ export default function App() {
   var fRef=useRef();
   var year=new Date().getFullYear();
 
-  useEffect(function(){loadData().then(function(d){setItems(d);setLoaded(true);});},[]);
+  useEffect(function(){Promise.all([loadConfig(),loadData()]).then(function(r){setItems(r[1]);setLoaded(true);});},[]);
 
   var campColors=useCampColors(items);
   var allCamps=[]; items.forEach(function(i){if(i.campaignName&&allCamps.indexOf(i.campaignName)===-1)allCamps.push(i.campaignName);}); allCamps.sort();
