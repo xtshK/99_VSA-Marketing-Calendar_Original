@@ -1,100 +1,49 @@
-# ViewSonic Americas — Marketing Calendar (VM deployment)
+# Marketing Calendar — SharePoint Host (temporary shared solution)
 
-A React frontend + small Express backend. The backend holds the model API key,
-proxies brief extraction to the internal **ViewSonic Omnis** model, and persists
-the calendar to a file on the VM so the whole team sees the same data.
+A per-user local host that stores the marketing calendar in a OneDrive/SharePoint
+synced folder, so a team shares one calendar with **no central server**. Each
+person runs their own host; everyone reads the merged calendar, but each person
+only writes their own items. OneDrive handles cross-user sync.
+
+> This is the interim solution. The long-term single-server version is in `../app/`.
+
+## How it works
 
 ```
-Browser ──▶ Express (:3000)
-              ├─ serves the built React app (dist/)
-              ├─ POST /api/extract  → extracts PDF text, then calls Omnis (/ask)
-              └─ GET/POST /api/data → reads/writes data/calendar.json
+You: "open the marketing calendar"  (in Claude Cowork / Claude Code)
+   → Claude runs:  npm install → npm run setup → npm run serve → opens localhost:3000
+You upload briefs / add items in the browser
+   → host writes to  <SharePoint>/_calendar_json/<you>/calendar.json
+                      <SharePoint>/_upload_briefs/<you>/<original file>
+   → OneDrive syncs → teammates' hosts see your items on their next load
 ```
 
-The Omnis model (`https://omnis.viewsonic.com:8007/ask`) is text-only, so PDFs
-are converted to text on the backend (via `pdf-parse`) before being sent.
+- Read: merges every `_calendar_json/*/calendar.json`; each item tagged with its owner.
+- Write: only your own file. Other people's items show as read-only (🔒).
+- Sync is eventual (OneDrive lag of seconds–minutes), not instant.
 
-## What changed from the original single file
+## For the user (via Claude)
 
-- `window.storage` (sandbox-only) → `GET/POST /api/data`, stored in `data/calendar.json`.
-- Direct browser → Anthropic call (key would leak) → `POST /api/extract` on the backend.
-- Added a build toolchain (Vite) and an Express server.
+In Claude Code or Cowork, say: **"Set up and open the marketing calendar in `sharepoint-host`."**
+Claude will run the steps below for you. The only thing it may ask you for is the
+**Omnis API key** (first time only).
 
-## Prerequisites on the VM
+## Manual steps (if running yourself)
 
-- **Node.js 18+** and npm. Check with `node -v`.
-- The VM must be able to reach `https://omnis.viewsonic.com:8007` (same network / VPN).
-- The Omnis API key.
-
-## One-time setup
+Prereqs: Node 18+, Chrome/Edge, and the SharePoint folder synced via OneDrive.
 
 ```bash
-cd app
+cd sharepoint-host
 npm install
-cp .env.example .env
-# edit .env: set OMNIS_API_KEY (and OMNIS_URL if it ever changes)
+npm run setup     # auto-detects the SharePoint folder, writes .env, makes your folders
+npm run serve     # builds + starts on http://localhost:3000
 ```
 
-## Run it (production-style, single process)
-
-```bash
-npm run serve     # builds the frontend, then starts Express on :3000
-```
-
-Open `http://<VM-IP>:3000` from a browser on the same network.
-
-> If you change the React code later, re-run `npm run build` (or `npm run serve`).
-> Plain `npm start` just runs the server against the existing `dist/`.
-
-## Keep it running after you log out
-
-Use a process manager so it survives terminal/SSH disconnects and reboots.
-
-**Option A — pm2 (simplest):**
-```bash
-sudo npm install -g pm2
-npm run build
-pm2 start server.js --name vs-calendar
-pm2 save
-pm2 startup     # follow the printed command to enable boot startup
-```
-
-**Option B — systemd:** create `/etc/systemd/system/vs-calendar.service`:
-```ini
-[Unit]
-Description=VS Marketing Calendar
-After=network.target
-
-[Service]
-WorkingDirectory=/path/to/app
-ExecStart=/usr/bin/node server.js
-Restart=always
-EnvironmentFile=/path/to/app/.env
-
-[Install]
-WantedBy=multi-user.target
-```
-Then: `sudo systemctl enable --now vs-calendar`
-
-## Open the firewall
-
-Allow inbound TCP on the port (default 3000). On Ubuntu: `sudo ufw allow 3000`.
-On a cloud VM (AWS/GCP/Azure), add an inbound rule in the security group / firewall.
-
-## Local development (two terminals)
-
-```bash
-npm run dev:api   # Express backend on :3000
-npm run dev:web   # Vite dev server on :5173 (proxies /api to :3000)
-```
-Open `http://localhost:5173`.
+Open http://localhost:3000.
 
 ## Notes
 
-- Uses the internal Omnis model — no external AI vendor or per-token cost.
-- Brief extraction is **text-only**: digital PDFs and Word/PowerPoint work, but
-  scanned/image-only PDFs return an error (no text to read).
-- This setup has **no login** (team-internal use). Anyone who can reach the port
-  can view and edit. Put it behind the company VPN / restrict the firewall to
-  trusted IPs. When you later need HTTPS or a domain, front it with nginx.
-- Back up `data/calendar.json` — it is the single source of truth for the calendar.
+- `npm test` runs the storage unit tests.
+- `.env` holds the Omnis key + your `USER_ID` + `SHAREPOINT_DIR`; it is git-ignored.
+- macOS only for auto-detection right now (Windows path differs).
+- You can only edit/delete your own items by design (per-user folders = permissions).
