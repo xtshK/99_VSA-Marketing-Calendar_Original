@@ -47,3 +47,4 @@ Open http://localhost:3000.
 - `.env` holds the Omnis key + your `USER_ID` + `SHAREPOINT_DIR`; it is git-ignored.
 - macOS only for auto-detection right now (Windows path differs).
 - You can only edit/delete your own items by design (per-user folders = permissions).
+- Duplicate detection runs per-host only: it checks your own view, not other users' files. "Replace" never touches another user's items — so the same campaign can appear once per user if two people add it.
